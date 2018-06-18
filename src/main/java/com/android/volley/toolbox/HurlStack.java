@@ -74,8 +74,9 @@ public class HurlStack extends BaseHttpStack {
             throws IOException, AuthFailureError {
         String url = request.getUrl();
         HashMap<String, String> map = new HashMap<>();
-        map.putAll(request.getHeaders());
         map.putAll(additionalHeaders);
+        // Request.getHeaders() takes precedence over the given additional (cache) headers).
+        map.putAll(request.getHeaders());
         if (mUrlRewriter != null) {
             String rewritten = mUrlRewriter.rewriteUrl(url);
             if (rewritten == null) {
@@ -88,7 +89,7 @@ public class HurlStack extends BaseHttpStack {
         boolean keepConnectionOpen = false;
         try {
             for (String headerName : map.keySet()) {
-                connection.addRequestProperty(headerName, map.get(headerName));
+                connection.setRequestProperty(headerName, map.get(headerName));
             }
             setConnectionParametersForRequest(connection, request);
             // Initialize HttpResponse with data from the HttpURLConnection.
@@ -219,6 +220,8 @@ public class HurlStack extends BaseHttpStack {
         return connection;
     }
 
+    // NOTE: Any request headers added here (via setRequestProperty or addRequestProperty) should be
+    // checked against the existing properties in the connection and not overridden if already set.
     @SuppressWarnings("deprecation")
     /* package */ static void setConnectionParametersForRequest(
             HttpURLConnection connection, Request<?> request) throws IOException, AuthFailureError {
@@ -276,13 +279,16 @@ public class HurlStack extends BaseHttpStack {
     }
 
     private static void addBody(HttpURLConnection connection, Request<?> request, byte[] body)
-            throws IOException, AuthFailureError {
+            throws IOException {
         // Prepare output. There is no need to set Content-Length explicitly,
         // since this is handled by HttpURLConnection using the size of the prepared
         // output stream.
         connection.setDoOutput(true);
-        connection.addRequestProperty(
-                HttpHeaderParser.HEADER_CONTENT_TYPE, request.getBodyContentType());
+        // Set the content-type unless it was already set (by Request#getHeaders).
+        if (!connection.getRequestProperties().containsKey(HttpHeaderParser.HEADER_CONTENT_TYPE)) {
+            connection.setRequestProperty(
+                    HttpHeaderParser.HEADER_CONTENT_TYPE, request.getBodyContentType());
+        }
         DataOutputStream out = new DataOutputStream(connection.getOutputStream());
         out.write(body);
         out.close();
