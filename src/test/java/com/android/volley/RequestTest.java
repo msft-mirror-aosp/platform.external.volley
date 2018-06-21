@@ -20,7 +20,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.android.volley.Request.Method;
 import com.android.volley.Request.Priority;
+import java.util.Collections;
+import java.util.Map;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
@@ -84,9 +87,30 @@ public class RequestTest {
         assertFalse(0 == goodProtocol.getTrafficStatsTag());
     }
 
+    @Test
+    public void getCacheKey() {
+        assertEquals(
+                "http://example.com",
+                new UrlParseRequest(Method.GET, "http://example.com").getCacheKey());
+        assertEquals(
+                "http://example.com",
+                new UrlParseRequest(Method.DEPRECATED_GET_OR_POST, "http://example.com")
+                        .getCacheKey());
+        assertEquals(
+                "1-http://example.com",
+                new UrlParseRequest(Method.POST, "http://example.com").getCacheKey());
+        assertEquals(
+                "2-http://example.com",
+                new UrlParseRequest(Method.PUT, "http://example.com").getCacheKey());
+    }
+
     private static class UrlParseRequest extends Request<Object> {
-        public UrlParseRequest(String url) {
-            super(Request.Method.GET, url, null);
+        UrlParseRequest(String url) {
+            this(Method.GET, url);
+        }
+
+        UrlParseRequest(int method, String url) {
+            super(method, url, null);
         }
 
         @Override
@@ -95,6 +119,74 @@ public class RequestTest {
         @Override
         protected Response<Object> parseNetworkResponse(NetworkResponse response) {
             return null;
+        }
+    }
+
+    @Test
+    public void nullKeyInPostParams() throws Exception {
+        Request<Object> request =
+                new Request<Object>(Method.POST, "url", null) {
+                    @Override
+                    protected void deliverResponse(Object response) {}
+
+                    @Override
+                    protected Response<Object> parseNetworkResponse(NetworkResponse response) {
+                        return null;
+                    }
+
+                    @Override
+                    protected Map<String, String> getParams() {
+                        return Collections.singletonMap(null, "value");
+                    }
+
+                    @Override
+                    protected Map<String, String> getPostParams() {
+                        return Collections.singletonMap(null, "value");
+                    }
+                };
+        try {
+            request.getBody();
+        } catch (IllegalArgumentException e) {
+            // expected
+        }
+        try {
+            request.getPostBody();
+        } catch (IllegalArgumentException e) {
+            // expected
+        }
+    }
+
+    @Test
+    public void nullValueInPostParams() throws Exception {
+        Request<Object> request =
+                new Request<Object>(Method.POST, "url", null) {
+                    @Override
+                    protected void deliverResponse(Object response) {}
+
+                    @Override
+                    protected Response<Object> parseNetworkResponse(NetworkResponse response) {
+                        return null;
+                    }
+
+                    @Override
+                    protected Map<String, String> getParams() {
+                        return Collections.singletonMap("key", null);
+                    }
+
+                    @Override
+                    protected Map<String, String> getPostParams() {
+                        return Collections.singletonMap("key", null);
+                    }
+                };
+        try {
+            request.getBody();
+        } catch (IllegalArgumentException e) {
+            // expected
+        }
+        try {
+            request.getPostBody();
+        } catch (IllegalArgumentException e) {
+            // expected
         }
     }
 }
