@@ -22,6 +22,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.support.annotation.CallSuper;
 import android.support.annotation.GuardedBy;
+import android.support.annotation.Nullable;
 import android.text.TextUtils;
 import com.android.volley.VolleyLog.MarkerLog;
 import java.io.UnsupportedEncodingException;
@@ -81,6 +82,7 @@ public abstract class Request<T> implements Comparable<Request<T>> {
     private final Object mLock = new Object();
 
     /** Listener interface for errors. */
+    @Nullable
     @GuardedBy("mLock")
     private Response.ErrorListener mErrorListener;
 
@@ -91,6 +93,7 @@ public abstract class Request<T> implements Comparable<Request<T>> {
     private RequestQueue mRequestQueue;
 
     /** Whether or not responses to this request should be cached. */
+    // TODO(#190): Turn this off by default for anything other than GET requests.
     private boolean mShouldCache = true;
 
     /** Whether or not this request has been canceled. */
@@ -139,7 +142,7 @@ public abstract class Request<T> implements Comparable<Request<T>> {
      * responses is provided by subclasses, who have a better idea of how to deliver an
      * already-parsed response.
      */
-    public Request(int method, String url, Response.ErrorListener listener) {
+    public Request(int method, String url, @Nullable Response.ErrorListener listener) {
         mMethod = method;
         mUrl = url;
         mErrorListener = listener;
@@ -174,6 +177,7 @@ public abstract class Request<T> implements Comparable<Request<T>> {
     }
 
     /** @return this request's {@link com.android.volley.Response.ErrorListener}. */
+    @Nullable
     public Response.ErrorListener getErrorListener() {
         synchronized (mLock) {
             return mErrorListener;
@@ -283,7 +287,18 @@ public abstract class Request<T> implements Comparable<Request<T>> {
 
     /** Returns the cache key for this request. By default, this is the URL. */
     public String getCacheKey() {
-        return getUrl();
+        String url = getUrl();
+        // If this is a GET request, just use the URL as the key.
+        // For callers using DEPRECATED_GET_OR_POST, we assume the method is GET, which matches
+        // legacy behavior where all methods had the same cache key. We can't determine which method
+        // will be used because doing so requires calling getPostBody() which is expensive and may
+        // throw AuthFailureError.
+        // TODO(#190): Remove support for non-GET methods.
+        int method = getMethod();
+        if (method == Method.GET || method == Method.DEPRECATED_GET_OR_POST) {
+            return url;
+        }
+        return Integer.toString(method) + '-' + url;
     }
 
     /**
@@ -458,6 +473,14 @@ public abstract class Request<T> implements Comparable<Request<T>> {
         StringBuilder encodedParams = new StringBuilder();
         try {
             for (Map.Entry<String, String> entry : params.entrySet()) {
+                if (entry.getKey() == null || entry.getValue() == null) {
+                    throw new IllegalArgumentException(
+                            String.format(
+                                    "Request#getParams() or Request#getPostParams() returned a map "
+                                            + "containing a null key or value: (%s, %s). All keys "
+                                            + "and values must be non-null.",
+                                    entry.getKey(), entry.getValue()));
+                }
                 encodedParams.append(URLEncoder.encode(entry.getKey(), paramsEncoding));
                 encodedParams.append('=');
                 encodedParams.append(URLEncoder.encode(entry.getValue(), paramsEncoding));
@@ -523,7 +546,7 @@ public abstract class Request<T> implements Comparable<Request<T>> {
      * remaining, this will cause delivery of a {@link TimeoutError} error.
      */
     public final int getTimeoutMs() {
-        return mRetryPolicy.getCurrentTimeout();
+        return getRetryPolicy().getCurrentTimeout();
     }
 
     /** Returns the retry policy that should be used for this request. */
