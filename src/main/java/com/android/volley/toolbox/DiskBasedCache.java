@@ -65,7 +65,7 @@ public class DiskBasedCache implements Cache {
     private static final int DEFAULT_DISK_USAGE_BYTES = 5 * 1024 * 1024;
 
     /** High water mark percentage for the cache */
-    private static final float HYSTERESIS_FACTOR = 0.9f;
+    @VisibleForTesting static final float HYSTERESIS_FACTOR = 0.9f;
 
     /** Magic number for current version of cache file format. */
     private static final int CACHE_MAGIC = 0x20150306;
@@ -74,7 +74,9 @@ public class DiskBasedCache implements Cache {
      * Constructs an instance of the DiskBasedCache at the specified directory.
      *
      * @param rootDirectory The root directory of the cache.
-     * @param maxCacheSizeInBytes The maximum size of the cache in bytes.
+     * @param maxCacheSizeInBytes The maximum size of the cache in bytes. Note that the cache may
+     *     briefly exceed this size on disk when writing a new entry that pushes it over the limit
+     *     until the ensuing pruning completes.
      */
     public DiskBasedCache(File rootDirectory, int maxCacheSizeInBytes) {
         mRootDirectory = rootDirectory;
@@ -166,8 +168,6 @@ public class DiskBasedCache implements Cache {
                                 new BufferedInputStream(createInputStream(file)), entrySize);
                 try {
                     CacheHeader entry = CacheHeader.readHeader(cis);
-                    // NOTE: When this entry was put, its size was recorded as data.length, but
-                    // when the entry is initialized below, its size is recorded as file.length()
                     entry.size = entrySize;
                     putEntry(entry.key, entry);
                 } finally {
@@ -203,7 +203,14 @@ public class DiskBasedCache implements Cache {
     /** Puts the entry with the specified key into the cache. */
     @Override
     public synchronized void put(String key, Entry entry) {
-        pruneIfNeeded(entry.data.length);
+        // If adding this entry would trigger a prune, but pruning would cause the new entry to be
+        // deleted, then skip writing the entry in the first place, as this is just churn.
+        // Note that we don't include the cache header overhead in this calculation for simplicity,
+        // so putting entries which are just below the threshold may still cause this churn.
+        if (mTotalSize + entry.data.length > mMaxCacheSizeInBytes
+                && entry.data.length > mMaxCacheSizeInBytes * HYSTERESIS_FACTOR) {
+            return;
+        }
         File file = getFileForKey(key);
         try {
             BufferedOutputStream fos = new BufferedOutputStream(createOutputStream(file));
@@ -216,7 +223,9 @@ public class DiskBasedCache implements Cache {
             }
             fos.write(entry.data);
             fos.close();
+            e.size = file.length();
             putEntry(key, e);
+            pruneIfNeeded();
             return;
         } catch (IOException e) {
         }
@@ -256,13 +265,9 @@ public class DiskBasedCache implements Cache {
         return new File(mRootDirectory, getFilenameForKey(key));
     }
 
-    /**
-     * Prunes the cache to fit the amount of bytes specified.
-     *
-     * @param neededSpace The amount of bytes we are trying to fit into the cache.
-     */
-    private void pruneIfNeeded(int neededSpace) {
-        if ((mTotalSize + neededSpace) < mMaxCacheSizeInBytes) {
+    /** Prunes the cache to fit the maximum size. */
+    private void pruneIfNeeded() {
+        if (mTotalSize < mMaxCacheSizeInBytes) {
             return;
         }
         if (VolleyLog.DEBUG) {
@@ -288,7 +293,7 @@ public class DiskBasedCache implements Cache {
             iterator.remove();
             prunedFiles++;
 
-            if ((mTotalSize + neededSpace) < mMaxCacheSizeInBytes * HYSTERESIS_FACTOR) {
+            if (mTotalSize < mMaxCacheSizeInBytes * HYSTERESIS_FACTOR) {
                 break;
             }
         }
@@ -331,7 +336,7 @@ public class DiskBasedCache implements Cache {
      * @param length number of bytes to read
      * @throws IOException if fails to read all bytes
      */
-    // VisibleForTesting
+    @VisibleForTesting
     static byte[] streamToBytes(CountingInputStream cis, long length) throws IOException {
         long maxLength = cis.bytesRemaining();
         // Length cannot be negative or greater than bytes remaining, and must not overflow int.
@@ -343,20 +348,26 @@ public class DiskBasedCache implements Cache {
         return bytes;
     }
 
-    // VisibleForTesting
+    @VisibleForTesting
     InputStream createInputStream(File file) throws FileNotFoundException {
         return new FileInputStream(file);
     }
 
-    // VisibleForTesting
+    @VisibleForTesting
     OutputStream createOutputStream(File file) throws FileNotFoundException {
         return new FileOutputStream(file);
     }
 
     /** Handles holding onto the cache headers for an entry. */
-    // VisibleForTesting
+    @VisibleForTesting
     static class CacheHeader {
-        /** The size of the data identified by this CacheHeader. (This is not serialized to disk. */
+        /**
+         * The size of the data identified by this CacheHeader on disk (both header and data).
+         *
+         * <p>Must be set by the caller after it has been calculated.
+         *
+         * <p>This is not serialized to disk.
+         */
         long size;
 
         /** The key that identifies the cache entry. */
@@ -389,7 +400,7 @@ public class DiskBasedCache implements Cache {
                 long softTtl,
                 List<Header> allResponseHeaders) {
             this.key = key;
-            this.etag = ("".equals(etag)) ? null : etag;
+            this.etag = "".equals(etag) ? null : etag;
             this.serverDate = serverDate;
             this.lastModified = lastModified;
             this.ttl = ttl;
@@ -412,7 +423,6 @@ public class DiskBasedCache implements Cache {
                     entry.ttl,
                     entry.softTtl,
                     getAllResponseHeaders(entry));
-            size = entry.data.length;
         }
 
         private static List<Header> getAllResponseHeaders(Entry entry) {
