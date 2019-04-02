@@ -21,5 +21,5 @@ java_library {
     srcs: ["src/main/java/**/*.java"],
 
     // Only needed at compile-time.
-    libs: ["android-support-annotations"],
+    libs: ["androidx.annotation_annotation"],
 }
