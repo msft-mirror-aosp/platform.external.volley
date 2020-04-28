@@ -15,7 +15,6 @@ package com.android.volley.toolbox;
 
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.ViewGroup.LayoutParams;
@@ -33,37 +32,25 @@ public class NetworkImageView extends ImageView {
 
     /**
      * Resource ID of the image to be used as a placeholder until the network image is loaded. Won't
-     * be set at the same time as mDefaultImageDrawable or mDefaultImageBitmap.
+     * be set at the same time as mDefaultImageBitmap.
      */
     private int mDefaultImageId;
 
     /**
-     * Drawable of the image to be used as a placeholder until the network image is loaded. Won't be
-     * set at the same time as mDefaultImageId or mDefaultImageBitmap.
-     */
-    @Nullable private Drawable mDefaultImageDrawable;
-
-    /**
      * Bitmap of the image to be used as a placeholder until the network image is loaded. Won't be
-     * set at the same time as mDefaultImageId or mDefaultImageDrawable.
+     * set at the same time as mDefaultImageId.
      */
-    @Nullable private Bitmap mDefaultImageBitmap;
+    @Nullable Bitmap mDefaultImageBitmap;
 
     /**
      * Resource ID of the image to be used if the network response fails. Won't be set at the same
-     * time as mErrorImageDrawable or mErrorImageBitmap.
+     * time as mErrorImageBitmap.
      */
     private int mErrorImageId;
 
     /**
      * Bitmap of the image to be used if the network response fails. Won't be set at the same time
-     * as mErrorImageId or mErrorImageBitmap.
-     */
-    @Nullable private Drawable mErrorImageDrawable;
-
-    /**
-     * Bitmap of the image to be used if the network response fails. Won't be set at the same time
-     * as mErrorImageId or mErrorImageDrawable.
+     * as mErrorImageId.
      */
     @Nullable private Bitmap mErrorImageBitmap;
 
@@ -113,38 +100,21 @@ public class NetworkImageView extends ImageView {
      * Sets the default image resource ID to be used for this view until the attempt to load it
      * completes.
      *
-     * <p>This will clear anything set by {@link NetworkImageView#setDefaultImageBitmap} or {@link
-     * NetworkImageView#setDefaultImageDrawable}.
+     * <p>This will clear anything set by {@link NetworkImageView#setDefaultImageBitmap}.
      */
     public void setDefaultImageResId(int defaultImage) {
         mDefaultImageBitmap = null;
-        mDefaultImageDrawable = null;
         mDefaultImageId = defaultImage;
-    }
-
-    /**
-     * Sets the default image drawable to be used for this view until the attempt to load it
-     * completes.
-     *
-     * <p>This will clear anything set by {@link NetworkImageView#setDefaultImageResId} or {@link
-     * NetworkImageView#setDefaultImageBitmap}.
-     */
-    public void setDefaultImageDrawable(@Nullable Drawable defaultImageDrawable) {
-        mDefaultImageId = 0;
-        mDefaultImageBitmap = null;
-        mDefaultImageDrawable = defaultImageDrawable;
     }
 
     /**
      * Sets the default image bitmap to be used for this view until the attempt to load it
      * completes.
      *
-     * <p>This will clear anything set by {@link NetworkImageView#setDefaultImageResId} or {@link
-     * NetworkImageView#setDefaultImageDrawable}.
+     * <p>This will clear anything set by {@link NetworkImageView#setDefaultImageResId}.
      */
     public void setDefaultImageBitmap(Bitmap defaultImage) {
         mDefaultImageId = 0;
-        mDefaultImageDrawable = null;
         mDefaultImageBitmap = defaultImage;
     }
 
@@ -152,38 +122,21 @@ public class NetworkImageView extends ImageView {
      * Sets the error image resource ID to be used for this view in the event that the image
      * requested fails to load.
      *
-     * <p>This will clear anything set by {@link NetworkImageView#setErrorImageBitmap} or {@link
-     * NetworkImageView#setErrorImageDrawable}.
+     * <p>This will clear anything set by {@link NetworkImageView#setErrorImageBitmap}.
      */
     public void setErrorImageResId(int errorImage) {
         mErrorImageBitmap = null;
-        mErrorImageDrawable = null;
         mErrorImageId = errorImage;
-    }
-
-    /**
-     * Sets the error image drawable to be used for this view in the event that the image requested
-     * fails to load.
-     *
-     * <p>This will clear anything set by {@link NetworkImageView#setErrorImageResId} or {@link
-     * NetworkImageView#setDefaultImageBitmap}.
-     */
-    public void setErrorImageDrawable(@Nullable Drawable errorImageDrawable) {
-        mErrorImageId = 0;
-        mErrorImageBitmap = null;
-        mErrorImageDrawable = errorImageDrawable;
     }
 
     /**
      * Sets the error image bitmap to be used for this view in the event that the image requested
      * fails to load.
      *
-     * <p>This will clear anything set by {@link NetworkImageView#setErrorImageResId} or {@link
-     * NetworkImageView#setDefaultImageDrawable}.
+     * <p>This will clear anything set by {@link NetworkImageView#setErrorImageResId}.
      */
     public void setErrorImageBitmap(Bitmap errorImage) {
         mErrorImageId = 0;
-        mErrorImageDrawable = null;
         mErrorImageBitmap = errorImage;
     }
 
@@ -249,8 +202,6 @@ public class NetworkImageView extends ImageView {
                             public void onErrorResponse(VolleyError error) {
                                 if (mErrorImageId != 0) {
                                     setImageResource(mErrorImageId);
-                                } else if (mErrorImageDrawable != null) {
-                                    setImageDrawable(mErrorImageDrawable);
                                 } else if (mErrorImageBitmap != null) {
                                     setImageBitmap(mErrorImageBitmap);
                                 }
@@ -281,8 +232,6 @@ public class NetworkImageView extends ImageView {
                                     setImageBitmap(response.getBitmap());
                                 } else if (mDefaultImageId != 0) {
                                     setImageResource(mDefaultImageId);
-                                } else if (mDefaultImageDrawable != null) {
-                                    setImageDrawable(mDefaultImageDrawable);
                                 } else if (mDefaultImageBitmap != null) {
                                     setImageBitmap(mDefaultImageBitmap);
                                 }
@@ -296,8 +245,6 @@ public class NetworkImageView extends ImageView {
     private void setDefaultImageOrNull() {
         if (mDefaultImageId != 0) {
             setImageResource(mDefaultImageId);
-        } else if (mDefaultImageDrawable != null) {
-            setImageDrawable(mDefaultImageDrawable);
         } else if (mDefaultImageBitmap != null) {
             setImageBitmap(mDefaultImageBitmap);
         } else {
