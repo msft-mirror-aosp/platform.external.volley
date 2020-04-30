@@ -16,6 +16,7 @@
 
 package com.android.volley.toolbox;
 
+import androidx.annotation.Nullable;
 import com.android.volley.Cache;
 import com.android.volley.Header;
 import com.android.volley.NetworkResponse;
@@ -37,7 +38,11 @@ public class HttpHeaderParser {
 
     private static final String DEFAULT_CONTENT_CHARSET = "ISO-8859-1";
 
-    private static final String RFC1123_FORMAT = "EEE, dd MMM yyyy HH:mm:ss zzz";
+    private static final String RFC1123_PARSE_FORMAT = "EEE, dd MMM yyyy HH:mm:ss zzz";
+
+    // Hardcode 'GMT' rather than using 'zzz' since some platforms append an extraneous +00:00.
+    // See #287.
+    private static final String RFC1123_OUTPUT_FORMAT = "EEE, dd MMM yyyy HH:mm:ss 'GMT'";
 
     /**
      * Extracts a {@link com.android.volley.Cache.Entry} from a {@link NetworkResponse}.
@@ -45,10 +50,14 @@ public class HttpHeaderParser {
      * @param response The network response to parse headers from
      * @return a cache entry for the given response, or null if the response is not cacheable.
      */
+    @Nullable
     public static Cache.Entry parseCacheHeaders(NetworkResponse response) {
         long now = System.currentTimeMillis();
 
         Map<String, String> headers = response.headers;
+        if (headers == null) {
+            return null;
+        }
 
         long serverDate = 0;
         long lastModified = 0;
@@ -132,21 +141,29 @@ public class HttpHeaderParser {
     public static long parseDateAsEpoch(String dateStr) {
         try {
             // Parse date in RFC1123 format if this header contains one
-            return newRfc1123Formatter().parse(dateStr).getTime();
+            return newUsGmtFormatter(RFC1123_PARSE_FORMAT).parse(dateStr).getTime();
         } catch (ParseException e) {
             // Date in invalid format, fallback to 0
-            VolleyLog.e(e, "Unable to parse dateStr: %s, falling back to 0", dateStr);
+            // If the value is either "0" or "-1" we only log to verbose,
+            // these values are pretty common and cause log spam.
+            String message = "Unable to parse dateStr: %s, falling back to 0";
+            if ("0".equals(dateStr) || "-1".equals(dateStr)) {
+                VolleyLog.v(message, dateStr);
+            } else {
+                VolleyLog.e(e, message, dateStr);
+            }
+
             return 0;
         }
     }
 
     /** Format an epoch date in RFC1123 format. */
     static String formatEpochAsRfc1123(long epoch) {
-        return newRfc1123Formatter().format(new Date(epoch));
+        return newUsGmtFormatter(RFC1123_OUTPUT_FORMAT).format(new Date(epoch));
     }
 
-    private static SimpleDateFormat newRfc1123Formatter() {
-        SimpleDateFormat formatter = new SimpleDateFormat(RFC1123_FORMAT, Locale.US);
+    private static SimpleDateFormat newUsGmtFormatter(String format) {
+        SimpleDateFormat formatter = new SimpleDateFormat(format, Locale.US);
         formatter.setTimeZone(TimeZone.getTimeZone("GMT"));
         return formatter;
     }
@@ -159,7 +176,11 @@ public class HttpHeaderParser {
      * @return Returns the charset specified in the Content-Type of this header, or the
      *     defaultCharset if none can be found.
      */
-    public static String parseCharset(Map<String, String> headers, String defaultCharset) {
+    public static String parseCharset(
+            @Nullable Map<String, String> headers, String defaultCharset) {
+        if (headers == null) {
+            return defaultCharset;
+        }
         String contentType = headers.get(HEADER_CONTENT_TYPE);
         if (contentType != null) {
             String[] params = contentType.split(";", 0);
@@ -180,7 +201,7 @@ public class HttpHeaderParser {
      * Returns the charset specified in the Content-Type of this header, or the HTTP default
      * (ISO-8859-1) if none can be found.
      */
-    public static String parseCharset(Map<String, String> headers) {
+    public static String parseCharset(@Nullable Map<String, String> headers) {
         return parseCharset(headers, DEFAULT_CONTENT_CHARSET);
     }
 
