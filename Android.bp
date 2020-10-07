@@ -21,6 +21,10 @@ java_library {
     min_sdk_version: "8",
     srcs: ["src/main/java/**/*.java"],
 
+    // Exclude Cronet support for now. Can be enabled later if/when Cronet is made available as a
+    // compilation dependency for Volley clients.
+    exclude_srcs: ["src/main/java/com/android/volley/cronet/**/*"],
+
     libs: [
         // Only needed at compile-time.
         "androidx.annotation_annotation",
