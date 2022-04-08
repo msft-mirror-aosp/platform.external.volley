@@ -15,9 +15,7 @@
  */
 package com.android.volley.toolbox;
 
-import androidx.annotation.Nullable;
 import com.android.volley.Header;
-import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.List;
@@ -28,8 +26,7 @@ public final class HttpResponse {
     private final int mStatusCode;
     private final List<Header> mHeaders;
     private final int mContentLength;
-    @Nullable private final InputStream mContent;
-    @Nullable private final byte[] mContentBytes;
+    private final InputStream mContent;
 
     /**
      * Construct a new HttpResponse for an empty response body.
@@ -56,23 +53,6 @@ public final class HttpResponse {
         mHeaders = headers;
         mContentLength = contentLength;
         mContent = content;
-        mContentBytes = null;
-    }
-
-    /**
-     * Construct a new HttpResponse.
-     *
-     * @param statusCode the HTTP status code of the response
-     * @param headers the response headers
-     * @param contentBytes a byte[] of the response content. This is an optimization for HTTP stacks
-     *     that natively support returning a byte[].
-     */
-    public HttpResponse(int statusCode, List<Header> headers, byte[] contentBytes) {
-        mStatusCode = statusCode;
-        mHeaders = headers;
-        mContentLength = contentBytes.length;
-        mContentBytes = contentBytes;
-        mContent = null;
     }
 
     /** Returns the HTTP status code of the response. */
@@ -91,28 +71,10 @@ public final class HttpResponse {
     }
 
     /**
-     * If a byte[] was already provided by an HTTP stack that natively supports returning one, this
-     * method will return that byte[] as an optimization over copying the bytes from an input
-     * stream. It may return null, even if the response has content, as long as mContent is
-     * provided.
-     */
-    @Nullable
-    public final byte[] getContentBytes() {
-        return mContentBytes;
-    }
-
-    /**
      * Returns an {@link InputStream} of the response content. May be null to indicate that the
      * response has no content.
      */
-    @Nullable
     public final InputStream getContent() {
-        if (mContent != null) {
-            return mContent;
-        } else if (mContentBytes != null) {
-            return new ByteArrayInputStream(mContentBytes);
-        } else {
-            return null;
-        }
+        return mContent;
     }
 }

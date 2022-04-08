@@ -62,6 +62,7 @@ android {
     buildToolsVersion = '28.0.3'
 
     defaultConfig {
+        // Keep in sync with src/main/AndroidManifest.xml
         minSdkVersion 8
     }
 }

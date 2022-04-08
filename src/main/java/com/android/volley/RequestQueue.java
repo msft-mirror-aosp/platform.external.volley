@@ -263,17 +263,13 @@ public class RequestQueue {
         request.addMarker("add-to-queue");
         sendRequestEvent(request, RequestEvent.REQUEST_QUEUED);
 
-        beginRequest(request);
-        return request;
-    }
-
-    <T> void beginRequest(Request<T> request) {
         // If the request is uncacheable, skip the cache queue and go straight to the network.
         if (!request.shouldCache()) {
-            sendRequestOverNetwork(request);
-        } else {
-            mCacheQueue.add(request);
+            mNetworkQueue.add(request);
+            return request;
         }
+        mCacheQueue.add(request);
+        return request;
     }
 
     /**
@@ -330,13 +326,5 @@ public class RequestQueue {
         synchronized (mFinishedListeners) {
             mFinishedListeners.remove(listener);
         }
-    }
-
-    public ResponseDelivery getResponseDelivery() {
-        return mDelivery;
-    }
-
-    <T> void sendRequestOverNetwork(Request<T> request) {
-        mNetworkQueue.add(request);
     }
 }
