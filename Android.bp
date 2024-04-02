@@ -47,4 +47,7 @@ java_library {
 
         "org.apache.http.legacy",
     ],
+    optional_uses_libs: [
+        "org.apache.http.legacy",
+    ],
 }
